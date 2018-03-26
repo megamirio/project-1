@@ -10,9 +10,9 @@ contract('Splitter', (accounts) => {
     const carol = accounts[3];  //Carol
 
     let inst;
+    let sendEther;
 
     beforeEach("Splitter creation", () => Splitter.new({from: alice}).then(_inst => inst = _inst));
-    var sendEther;
 
     it("Alice sends Ether to Bob and Carol", sendEther = async () => {
 
@@ -30,16 +30,16 @@ contract('Splitter', (accounts) => {
             balances.push(web3.eth.getBalancePromise(bob));
             balances.push(web3.eth.getBalancePromise(carol));
             return Promise.all(balances);
-        };
+        }();
 
         await function () {
             initBalance = monBalance;
-            return inst.send.sendTransaction(bob, carol, {from: alice, value: FOR_ADDING});
-        }
+            inst.send.sendTransaction(bob, carol, {from: alice, value: FOR_ADDING});
+        }();
 
-        const compBalances = await function () {
-            return Promise.all([inst.balances.call(alice), inst.balances.call(bob), inst.balances.call(carol)]);
-        }
+        const compBalances = await Promise.all([inst.balances.call(alice), inst.balances.call(bob), inst.balances
+            .call(carol)]);
+
 
         assert.equal(compBalances[0], 0);
         assert.equal(compBalances[1], FOR_ADDING);
@@ -47,35 +47,36 @@ contract('Splitter', (accounts) => {
     });
 
 
-    it("Withdrawing", () => {
+    it("Withdrawing", async () => {
 
         const WITHDRAW_AMMOUNT = 1000000;
         const GAT_PRICE = 1000;
 
         let initBalance;
-        let transcation;
+        let transaction;
         let expectedBalance;
 
-        return web3.eth.getBalancePromise(bob).then(balance => {
+        const balance = await web3.eth.getBalancePromise(bob);
+
+        await function () {
             initBalance = balance;
-            return sendEther();
-        })
-            .then(() => inst.balances.call(bob))
-            .then((balance) => assert.equal(balance.toString(), 5000000, "initial balance of Bob in contract is wrong"))
-            .then(() => inst.withdraw.sendTransaction(WITHDRAW_AMMOUNT, {from: bob, gasPrice: GAT_PRICE}))
-            .then((result) => {
-                transcation = result;
-                return inst.balances.call(bob);
-            })
-            .then((balance) => assert.equal(balance.toString(), 4000000, "Bobs balance in contract after withdraw"))
-            .then(() => web3.eth.getTransactionReceipt(transcation))
-            .then((result) => {
-                return result["gasUsed"];
-            })
-            .then((result) => expectedBalance = initBalance - result * GAT_PRICE + WITHDRAW_AMMOUNT)
-            .then(() => web3.eth.getBalancePromise(bob))
-            .then((balance) => {
-                assert.equal(balance.toString(), expectedBalance, "actual Bobs balance is wrong after withdraw");
-            });
+            sendEther();
+        }();
+
+        const bal = await inst.balances.call(bob);
+        await assert.equal(bal.toString(), 5000000);
+        const resSent = await inst.withdraw.sendTransaction(WITHDRAW_AMMOUNT, {from: bob, gasPrice: GAT_PRICE});
+
+        const bobBal = await function () {
+            transaction = resSent;
+            return inst.balances.call(bob);
+        }();
+
+        await assert.equal(bobBal.toString(), 4000000);
+        const resTrans = await web3.eth.getTransactionReceipt(transaction);
+        const resGasUsed = await resTrans["gasUsed"];
+        await (expectedBalance = initBalance - resGasUsed * gasPrice + value_to_withdraw);
+        const resBal = await web3.eth.getBalancePromise(bob);
+        await assert.equal(resBal.toString(), expectedBalance);
     });
 });
