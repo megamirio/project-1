@@ -1,0 +1,18 @@
+{
+  "name": "project-1",
+  "version": "0.0.1",
+  "description": "Project 1 - Slitter of Consensys Academy Ethereum Developer Module 4 - Web3 and Truffle",
+  "scripts": {
+    "test": "mocha"
+  },
+  "dependencies": {
+    "bluebird": "^3.5.1",
+    "truffle": "^4.1.0",
+    "web3": "0.20.6"
+  },
+  "devDependencies": {
+    "assert-plus": "^1.0.0",
+    "ganache-cli": "6.1.0",
+    "mocha": "^5.0.5"
+  }
+}
