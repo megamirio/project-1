@@ -2,38 +2,36 @@ pragma solidity ^0.4.17;
 
 contract Splitter {
 
-    mapping(address => uint256) public balances;
+    address owner;
 
-    event FundsWithdrawed(address, uint);
-    event FundsAdded(address, uint);
+    mapping(address=>uint) public balances;
+    event LogEtherAdded(address  from, address  to, uint value);
+    event LogEtherWithdrawed(address  receiver, uint value);
 
     function Splitter() public {
         owner = msg.sender;
     }
 
-    function send(address first, address second) public payable {
-        require(first != 0);
-        require(second != 0);
+    function sendEther(address bob, address carol) public payable {
 
-        uint value = msg.value / 2;
-        balances[first] += value;
-        LogEtherAdded(msg.sender, first, value);
-
-        balances[second] += msg.value - value;
-        LogEtherAdded(msg.sender, second, msg.value - value);
+        require(carol != 0);
+        require(bob != 0);
+        uint value = msg.value/2;
+        balances[bob] += value;
+        LogEtherAdded(msg.sender, bob, value);
+        balances[carol] += (msg.value - value);
+        LogEtherAdded(msg.sender, carol, msg.value - value);
     }
 
-    function withdrawing(uint quantity) public {
-        require(quantity != 0);
-        require(quantity <= balances[msg.sender]);
-
-        balances[msg.sender] -= quantity;
-
-        LogEtherWithdrawed(msg.sender, quantity);
-        msg.sender.transfer(quantity);
-    }
-
-    function withdrawingAll() public {
+    function withdrawAll() public {
         withdraw(balances[msg.sender]);
+    }
+
+    function withdraw(uint amount) public {
+        require(amount!=0);
+        require(amount <= balances[msg.sender]);
+        balances[msg.sender] -= amount;
+        LogEtherWithdrawed(msg.sender, amount);
+        msg.sender.transfer(amount);
     }
 }

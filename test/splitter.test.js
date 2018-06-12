@@ -1,82 +1,80 @@
 import Splitter from "../contracts/Splitter.sol";
 import Promise from "bluebird";
 
-Promise.promisifyAll(web3.eth, {suffix: "Promise"});
+Promise = require("bluebird");
+Promise.promisifyAll(web3.eth, { suffix: "Promise" });
 
-contract('Splitter', (accounts) => {
+contract('Splitter', function(accounts) {
 
-    const alice = alice;  //Alice
-    const bob = bob; //Bob
-    const carol = accounts[3];  //Carol
+    var instance;
 
-    let inst;
-    let sendEther;
+    beforeEach("Create new Splitter", ()=>
+        Splitter.new({from:accounts[0]}).then(_instance => instance = _instance)
+    );
 
-    beforeEach("Splitter creation", () => Splitter.new({from: alice}).then(_inst => inst = _inst));
+    var sendEtherFunction;
 
-    it("Alice sends Ether to Bob and Carol", sendEther = async () => {
+    it("Alice(accounts[0]) should send Ether to contract for Bob(accounts[1]) and Carol(accounts[2])", sendEtherFunction = function() {
 
-        var FOR_ADDING = 10000000;
+        var VALUE_FOR_ADD = 10000000;
+        var initBalances;
+
+        assert(accounts.length>=3, "not enought acccounts to test");
+        return web3.eth.getBalancePromise(accounts[0]).then
+        (
+            balance =>
+            {
+                assert(balance> VALUE_FOR_ADD, "Alice does not have enought money to send 10000000 Wei");
+                var balancePromises = []
+                for(i=0;i<3;i++)
+                    balancePromises.push(web3.eth.getBalancePromise(accounts[i]));
+                return Promise.all(balancePromises);
+            }
+        ).then(balances =>
+        {
+            initBalances = balances;
+            return instance.sendEther.sendTransaction(accounts[1], accounts[2], { from: accounts[0], value: VALUE_FOR_ADD});
+        }).then(() =>
+        {
+            return Promise.all([instance.balances.call(accounts[0]),instance.balances.call(accounts[1]),instance.balances.call(accounts[2])]);
+        }).then((balances) =>
+        {
+            assert.equal(balances[0], 0, "Alice balance failed");
+            assert.equal(balances[1], VALUE_FOR_ADD / 2, "Bob balance failed");
+            assert.equal(balances[2], VALUE_FOR_ADD - VALUE_FOR_ADD / 2, "Carol balance failed");
+        });
+    });
+
+    it("Bob(accounts[1]) should withdraw part of the funds", withdrawEtherFunction = function() {
+
+        var VALUE_FOR_WITHDRAW = 1000000;
+        var GAS_PRICE = 1000;
         var initBalance;
+        var bob = accounts[1];
+        var transcation;
+        var gasUsed;
+        var expectedBalance;
 
-        assert(accounts.length >= 3, "Should be at least 3 accounts (Alice, Bob and Carol)");
-
-        const balance = await web3.eth.getBalancePromise(alice);
-
-        const monBalance = await function () {
-            assert(balance > value_to_add, "Alice have no money to send 10000000 Wei");
-            var balances = [];
-            balances.push(web3.eth.getBalancePromise(alice));
-            balances.push(web3.eth.getBalancePromise(bob));
-            balances.push(web3.eth.getBalancePromise(carol));
-            return Promise.all(balances);
-        }();
-
-        await function () {
-            initBalance = monBalance;
-            inst.send.sendTransaction(bob, carol, {from: alice, value: FOR_ADDING});
-        }();
-
-        const compBalances = await Promise.all([inst.balances.call(alice), inst.balances.call(bob), inst.balances
-            .call(carol)]);
-
-
-        assert.equal(compBalances[0], 0);
-        assert.equal(compBalances[1], FOR_ADDING);
-        assert.equal(compBalances[2], FOR_ADDING);
-    });
-
-
-    it("Withdrawing", async () => {
-
-        const WITHDRAW_AMMOUNT = 1000000;
-        const GAT_PRICE = 1000;
-
-        let initBalance;
-        let transaction;
-        let expectedBalance;
-
-        const balance = await web3.eth.getBalancePromise(bob);
-
-        await function () {
+        return web3.eth.getBalancePromise(bob).then( balance =>
+        {
             initBalance = balance;
-            sendEther();
-        }();
+            return sendEtherFunction();
+        })
+            .then(()=> instance.balances.call(bob))
+            .then((balance)=> assert.equal(balance.toString(), 5000000, "initial balance of Bob in contract is wrong"))
+            .then(()=> instance.withdraw.sendTransaction(VALUE_FOR_WITHDRAW, {from : bob, gasPrice : GAS_PRICE}))
+            .then((result)=> { transcation=result; return instance.balances.call(bob);})
+            .then((balance)=> assert.equal(balance.toString(), 4000000, "Bobs balance in contract after withdraw"))
+            .then(()=>web3.eth.getTransactionReceipt(transcation))
+            .then((result)=> {return result["gasUsed"];})
+            .then((result) => expectedBalance = initBalance - result * GAS_PRICE + VALUE_FOR_WITHDRAW)
+            .then(()=>web3.eth.getBalancePromise(bob))
+            .then((balance)=> {
+                assert.equal(balance.toString(), expectedBalance, "actual Bobs balance is wrong after withdraw");
+            });
 
-        const bal = await inst.balances.call(bob);
-        await assert.equal(bal.toString(), 5000000);
-        const resSent = await inst.withdraw.sendTransaction(WITHDRAW_AMMOUNT, {from: bob, gasPrice: GAT_PRICE});
-
-        const bobBal = await function () {
-            transaction = resSent;
-            return inst.balances.call(bob);
-        }();
-
-        await assert.equal(bobBal.toString(), 4000000);
-        const resTrans = await web3.eth.getTransactionReceipt(transaction);
-        const resGasUsed = await resTrans["gasUsed"];
-        await (expectedBalance = initBalance - resGasUsed * gasPrice + value_to_withdraw);
-        const resBal = await web3.eth.getBalancePromise(bob);
-        await assert.equal(resBal.toString(), expectedBalance);
     });
+
+
+
 });
